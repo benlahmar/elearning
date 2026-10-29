@@ -2,7 +2,16 @@
 
 Plateforme pédagogique de vidéos et de fichiers pour expérimenter des systèmes de recommandation. Équipe : 5 ingénieurs. Planning indicatif : 4 semaines, à ajuster selon la disponibilité de l’équipe.
 
-**Statut : dossier de conception et backlog ; application à implémenter.**
+**Statut : première tranche de développement disponible (v0.1).** Connexion de démonstration, catalogue, lecteur instrumenté, progression, favoris et premiers classements. Les sections ci-dessous décrivent la cible complète du MVP, pas uniquement ce qui est déjà implémenté.
+
+## Lancer la version actuelle
+
+```sh
+cp .env.example .env
+docker compose up --build
+```
+
+Ouvrir http://localhost:8080 et utiliser les identifiants définis dans `.env`. Consultez [le guide de développement](docs/DEVELOPMENT.md) pour le démarrage sans Docker, les tests et les limites de cette version. Les vidéos sont des médias publics de démonstration ; le stockage privé et l’administration seront ajoutés dans les prochaines étapes.
 
 ## Objectif
 
