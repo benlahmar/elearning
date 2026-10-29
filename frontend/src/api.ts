@@ -1,7 +1,7 @@
 let token = ''
 export function setToken(value: string) { token = value }
 export async function api<T = any>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch('/api' + path, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } })
+  const response = await fetch('/api' + path, { ...options, headers: { ...(options.body instanceof Blob ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers } })
   if (!response.ok) {
     const data = await response.json().catch(() => ({}))
     throw new Error(typeof data.detail === 'string' ? data.detail : `Erreur ${response.status}`)

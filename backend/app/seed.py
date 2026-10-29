@@ -23,3 +23,14 @@ def seed(db):
         if not db.get(Resource, id_):
             db.add(Resource(id=id_, title=title, description=description, topic=topic, level=level, kind=kind, duration=duration, url=url, tags=tags))
     db.commit()
+
+    admin_email, admin_password = os.getenv('ADMIN_EMAIL'), os.getenv('ADMIN_PASSWORD')
+    if admin_email and admin_password:
+        if len(admin_password) < 12:
+            raise ValueError('ADMIN_PASSWORD doit contenir au moins 12 caractères')
+        admin = db.scalar(select(User).where(User.email == admin_email.lower()))
+        if not admin:
+            admin = User(id=str(uuid.uuid4()), email=admin_email.lower(), password_hash=PasswordHash.recommended().hash(admin_password), interests=[], role='admin')
+            db.add(admin)
+        admin.role = 'admin'
+        db.commit()

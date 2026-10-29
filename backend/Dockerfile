@@ -6,6 +6,7 @@ RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then PIP_CERT=/run/secrets/proxy_ca pip install --no-cache-dir -r requirements.txt; \
     else pip install --no-cache-dir -r requirements.txt; fi
 COPY app ./app
+COPY migrations ./migrations
 RUN useradd --create-home learner && chown -R learner:learner /app
 USER learner
 EXPOSE 8000

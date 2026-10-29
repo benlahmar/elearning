@@ -14,9 +14,12 @@ from pwdlib import PasswordHash
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from .db import AuthSession, Base, Event, Feedback, LearningSession, Resource, User, database, now
+from .db import AuthSession, Course, Event, Feedback, LearningSession, Resource, User, database, now
 from .metrics import coverage
 from .seed import seed
+from .migrate import migrate
+from .admin import install_admin
+from .storage import get_storage
 
 passwords = PasswordHash.recommended()
 dummy_hash = passwords.hash('invalid-password-placeholder')
@@ -68,7 +71,7 @@ class FeedbackInput(BaseModel):
 
 
 def public_resource(r):
-    return {key: getattr(r, key) for key in ['id', 'title', 'description', 'topic', 'level', 'kind', 'duration', 'url', 'tags']}
+    return {key: getattr(r, key) for key in ['id', 'title', 'description', 'topic', 'level', 'kind', 'duration', 'url', 'tags', 'course_id', 'archived']}
 
 
 def create_app(database_url=None):
@@ -76,8 +79,7 @@ def create_app(database_url=None):
 
     @asynccontextmanager
     async def lifespan(app):
-        # Bootstrap for iteration 1. Replace with Alembic before evolving the schema.
-        Base.metadata.create_all(engine)
+        migrate(engine)
         with sessions() as db:
             seed(db)
         yield
@@ -88,7 +90,7 @@ def create_app(database_url=None):
 
     @app.middleware('http')
     async def body_limit(request, call_next):
-        if request.method in ('POST', 'PUT', 'PATCH'):
+        if request.method in ('POST', 'PUT', 'PATCH') and not (request.method == 'PUT' and request.url.path.endswith('/content')):
             # Read a bounded stream, including requests without Content-Length.
             chunks, size = [], 0
             async for chunk in request.stream():
@@ -139,7 +141,7 @@ def create_app(database_url=None):
 
     @app.get('/me')
     def me(user=Depends(current_user)):
-        return {'id': user.id, 'email': user.email, 'interests': user.interests}
+        return {'id': user.id, 'email': user.email, 'interests': user.interests, 'role': user.role}
 
     @app.patch('/me/profile')
     def profile(data: Profile, user=Depends(current_user), db=Depends(db_session)):
@@ -147,22 +149,36 @@ def create_app(database_url=None):
         db.commit()
         return {'interests': user.interests}
 
+    def visible():
+        return (Resource.archived.is_(False), (Resource.url != '') | Resource.object_key.is_not(None), Resource.course_id.is_(None) | Resource.course_id.in_(select(Course.id).where(Course.archived.is_(False))))
+
+    @app.get('/courses')
+    def courses(user=Depends(current_user), db=Depends(db_session)):
+        return [{'id': c.id, 'title': c.title, 'description': c.description} for c in db.scalars(select(Course).where(Course.archived.is_(False)).order_by(Course.title))]
+
     @app.get('/resources')
-    def resources(q: str = '', topic: str = '', kind: str = '', offset: int = 0, limit: int = 20, user=Depends(current_user), db=Depends(db_session)):
-        query = select(Resource)
+    def resources(q: str = '', topic: str = '', kind: str = '', course_id: str = '', offset: int = 0, limit: int = 20, user=Depends(current_user), db=Depends(db_session)):
+        query = select(Resource).where(*visible())
         if q:
             query = query.where(Resource.title.ilike('%' + q[:100] + '%'))
         if topic:
             query = query.where(Resource.topic == topic)
+        if course_id:
+            query = query.where(Resource.course_id == course_id)
         if kind:
             query = query.where(Resource.kind == kind)
         return [public_resource(r) for r in db.scalars(query.order_by(Resource.id).offset(max(0, offset)).limit(min(100, max(1, limit))))]
 
     def resource_or_404(db, id_):
         resource = db.get(Resource, id_)
-        if not resource:
+        if not resource or resource.archived or (not resource.url and not resource.object_key) or (resource.course_id and db.get(Course, resource.course_id).archived):
             raise HTTPException(404, 'Ressource introuvable')
         return resource
+
+    @app.get('/resources/{id_}/access-url')
+    def access_url(id_: str, user=Depends(current_user), db=Depends(db_session)):
+        resource = resource_or_404(db, id_)
+        return {'url': get_storage().access_url(resource.object_key) if resource.object_key else resource.url, 'expires_in': 300 if resource.object_key else None}
 
     @app.post('/resources/{id_}/sessions')
     def start_session(id_: str, user=Depends(current_user), db=Depends(db_session)):
@@ -237,7 +253,7 @@ def create_app(database_url=None):
 
     @app.get('/recommendations')
     def recommendations(algorithm: Literal['popular', 'content'] = 'content', user=Depends(current_user), db=Depends(db_session)):
-        resources = list(db.scalars(select(Resource)))
+        resources = list(db.scalars(select(Resource).where(*visible())))
         # Count distinct learners, not raw play/pause frequency.
         popularity = dict(db.execute(select(Event.resource_id, func.count(func.distinct(Event.user_id))).group_by(Event.resource_id)).all())
         interests = set(re.findall(r'\w+', ' '.join(user.interests).lower()))
@@ -247,6 +263,7 @@ def create_app(database_url=None):
         ranked = sorted(resources, key=lambda r: (-score(r), r.id))[:6]
         return {'algorithm': algorithm, 'version': '1', 'items': [{**public_resource(r), 'reason': 'Selon vos intérêts' if algorithm == 'content' and interests else 'À découvrir dans le catalogue'} for r in ranked]}
 
+    install_admin(app, db_session, current_user)
     return app
 
 

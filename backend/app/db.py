@@ -19,6 +19,15 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True)
     password_hash: Mapped[str] = mapped_column(String)
     interests: Mapped[list] = mapped_column(JSON, default=list)
+    role: Mapped[str] = mapped_column(String, default='learner', server_default='learner')
+
+
+class Course(Base):
+    __tablename__ = 'courses'
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    title: Mapped[str] = mapped_column(String)
+    description: Mapped[str] = mapped_column(String)
+    archived: Mapped[bool] = mapped_column(default=False, server_default='false')
 
 
 class AuthSession(Base):
@@ -39,6 +48,9 @@ class Resource(Base):
     duration: Mapped[float] = mapped_column(Float, default=0)
     url: Mapped[str] = mapped_column(String)
     tags: Mapped[list] = mapped_column(JSON, default=list)
+    course_id: Mapped[str | None] = mapped_column(ForeignKey('courses.id'))
+    object_key: Mapped[str | None] = mapped_column(String)
+    archived: Mapped[bool] = mapped_column(default=False, server_default='false')
 
 
 class LearningSession(Base):

@@ -3,3 +3,5 @@ uvicorn==0.34.2
 SQLAlchemy==2.0.40
 psycopg[binary]==3.2.6
 pwdlib[argon2]==0.2.1
+alembic==1.16.5
+boto3==1.40.61
