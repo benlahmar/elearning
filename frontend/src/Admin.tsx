@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { api } from './api'
 import './admin.css'
+import { Analytics } from './Analytics'
 
 type Course = { id: string; title: string; description: string; archived: boolean }
 type Resource = { id: string; title: string; description: string; topic: string; level: string; kind: string; duration: number; tags: string[]; course_id: string; archived: boolean; ready: boolean }
 const emptyResource = { title: '', description: '', topic: '', level: 'Débutant', kind: 'video', duration: 0, tags: [], course_id: '', archived: false } as Omit<Resource, 'id' | 'ready'>
 
 export function Admin({ onChange }: { onChange: () => void }) {
+  const [analyticsView, setAnalyticsView] = useState(false)
   const [courses, setCourses] = useState<Course[]>([]), [resources, setResources] = useState<Resource[]>([])
   const [course, setCourse] = useState({ id: '', title: '', description: '', archived: false })
   const [resource, setResource] = useState({ ...emptyResource, id: '', ready: false })
@@ -24,7 +26,8 @@ export function Admin({ onChange }: { onChange: () => void }) {
     video.onerror = () => { URL.revokeObjectURL(url); setError('Vidéo illisible : choisissez un MP4 compatible avec le navigateur') }
     video.src = url
   }
-  return <section className="admin"><span className="eyebrow">GESTION DES CONTENUS</span><h1>Administration</h1>{error && <p role="alert" className="alert">{error}</p>}{message && <p role="status">{message}</p>}
+  if (analyticsView) return <><button className="text-button" onClick={() => setAnalyticsView(false)}>← Gestion des contenus</button><Analytics /></>
+  return <section className="admin"><span className="eyebrow">GESTION DES CONTENUS</span><h1>Administration</h1><button className="primary" onClick={() => setAnalyticsView(true)}>Analyse des interactions →</button>{error && <p role="alert" className="alert">{error}</p>}{message && <p role="status">{message}</p>}
     <div className="admin-grid"><section className="detail"><h2>{course.id ? 'Modifier le cours' : 'Créer un cours'}</h2><form onSubmit={e => { e.preventDefault(); void run(async () => { await api('/admin/courses' + (course.id ? '/' + course.id : ''), { method: course.id ? 'PUT' : 'POST', body: JSON.stringify(course) }); setCourse({ id: '', title: '', description: '', archived: false }); setMessage('Cours enregistré') }) }}>
       <label>Titre<input required maxLength={200} value={course.title} onChange={e => setCourse({ ...course, title: e.target.value })}/></label><label>Description<textarea value={course.description} onChange={e => setCourse({ ...course, description: e.target.value })}/></label>
       <label><input type="checkbox" checked={course.archived} onChange={e => setCourse({ ...course, archived: e.target.checked })}/> Archiver le cours et masquer ses ressources</label><button className="primary" disabled={busy}>Enregistrer le cours</button><button type="button" className="text-button" onClick={() => setCourse({ id: '', title: '', description: '', archived: false })}>Nouveau cours</button>

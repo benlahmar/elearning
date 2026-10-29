@@ -61,10 +61,15 @@ def test_legacy_migration_keeps_data(tmp_path):
         config.attributes['connection'] = connection
         command.upgrade(config, '0001')
         connection.execute(text("INSERT INTO users (id,email,password_hash,interests) VALUES ('legacy','old@example.com','original-hash','[]')"))
+        connection.execute(text("INSERT INTO resources (id,title,description,topic,level,kind,duration,url,tags) VALUES ('old-video','Old','','Test','Test','video',120,'https://example.com/video','[]')"))
+        connection.execute(text("INSERT INTO learning_sessions (id,user_id,resource_id) VALUES ('old-session','legacy','old-video')"))
+        connection.execute(text("INSERT INTO interaction_events (event_id,user_id,resource_id,session_id,sequence,event_type,occurred_at,received_at,position_seconds,payload) VALUES ('old-event','legacy','old-video','old-session',1,'play',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,'{}')"))
         connection.execute(text('DROP TABLE alembic_version'))
     migrate(engine)
     migrate(engine)
     with engine.connect() as connection:
         assert tuple(connection.execute(text("SELECT password_hash, role FROM users WHERE id='legacy'")).one()) == ('original-hash', 'learner')
         assert 'courses' in inspect(connection).get_table_names()
-        assert connection.execute(text('SELECT version_num FROM alembic_version')).scalar() == '0002'
+        assert connection.execute(text('SELECT version_num FROM alembic_version')).scalar() == '0003'
+        assert connection.execute(text("SELECT created_at FROM learning_sessions WHERE id='old-session'")).scalar() is None
+        assert connection.execute(text("SELECT COUNT(*) FROM interaction_events WHERE event_id='old-event'")).scalar() == 1

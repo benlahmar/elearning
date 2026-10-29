@@ -2,7 +2,9 @@
 
 Plateforme pédagogique de vidéos et de fichiers pour expérimenter des systèmes de recommandation. Équipe : 5 ingénieurs. Planning indicatif : 4 semaines, à ajuster selon la disponibilité de l’équipe.
 
-**Statut : version 0.2 : administration et contenus privés.** Connexion de démonstration, catalogue, lecteur instrumenté, progression, favoris et premiers classements. Les sections ci-dessous décrivent la cible complète du MVP, pas uniquement ce qui est déjà implémenté.
+**Statut : version 0.3 : tableau de bord des interactions.** Connexion de démonstration, catalogue, lecteur instrumenté, progression, favoris et premiers classements. Les sections ci-dessous décrivent la cible complète du MVP, pas uniquement ce qui est déjà implémenté.
+
+Le tableau de bord, les exports pseudonymisés et la politique de conservation sont accessibles dans Administration → Analyse des interactions. Voir [le guide de la version 0.3](docs/ANALYTICS.md).
 
 ## Lancer la version actuelle
 
