@@ -12,6 +12,7 @@ export function VideoPlayer({ resource, sessionId, initial, onProgress }: { reso
     let queue: any[] = []
     let anchor: { position: number; time: number; rate: number } | null = null
     let stable = 0, seekFrom = 0, resuming = false, rate = v.playbackRate
+    let initialized = false, renewedAt = 0
     const emit = (event_type: string, payload = {}) => {
       if (queue.length >= 500) { queue.shift(); if (!disposed) setStatus('File pleine : certaines interactions ont été perdues') }
       queue.push({ schema_version: 1, event_id: crypto.randomUUID(), session_id: sessionId, resource_id: resource.id, sequence: ++sequence, event_type, occurred_at: new Date().toISOString(), position_seconds: v.currentTime, payload })
@@ -42,6 +43,8 @@ export function VideoPlayer({ resource, sessionId, initial, onProgress }: { reso
       finally { busy = false }
     }
     const loaded = () => {
+      if (initialized) return
+      initialized = true
       if (initial.position_seconds > 0 && initial.position_seconds < v.duration - 2) {
         resuming = true
         v.currentTime = Math.min(initial.position_seconds, v.duration)
@@ -61,7 +64,24 @@ export function VideoPlayer({ resource, sessionId, initial, onProgress }: { reso
     const ended = () => { sample(); anchor = null; emit('ended'); void flush() }
     const visibility = () => { sample(); emit('visibility_change', { visible: document.visibilityState === 'visible' }); void flush() }
     const pagehide = () => { sample(); void flush(true) }
-    const handlers = { loadedmetadata: loaded, play, playing, pause, waiting, seeking, seeked, timeupdate, ratechange, ended }
+    const error = async () => {
+      if (!v.src.includes('X-Amz-') || Date.now() - renewedAt < 60000) return
+      renewedAt = Date.now()
+      const position = v.currentTime, wasPlaying = !v.paused
+      try {
+        const access = await api<{ url: string }>(`/resources/${resource.id}/access-url`)
+        if (disposed) return
+        v.addEventListener('loadedmetadata', () => {
+          resuming = position > 0
+          v.currentTime = position
+          if (wasPlaying) void v.play().catch(() => {})
+        }, { once: true })
+        v.src = access.url
+        v.load()
+        setMediaError(false)
+      } catch { if (!disposed) setMediaError(true) }
+    }
+    const handlers = { loadedmetadata: loaded, play, playing, pause, waiting, seeking, seeked, timeupdate, ratechange, ended, error }
     for (const [name, handler] of Object.entries(handlers)) v.addEventListener(name, handler)
     document.addEventListener('visibilitychange', visibility)
     window.addEventListener('pagehide', pagehide)
