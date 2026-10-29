@@ -58,6 +58,7 @@ class LearningSession(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
     resource_id: Mapped[str] = mapped_column(ForeignKey('resources.id'))
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=now)
 
 
 class Event(Base):
@@ -82,6 +83,25 @@ class Feedback(Base):
     resource_id: Mapped[str] = mapped_column(ForeignKey('resources.id'))
     useful: Mapped[bool | None]
     favorite: Mapped[bool] = mapped_column(default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class IngestionRecord(Base):
+    __tablename__ = 'ingestion_records'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
+    accepted: Mapped[int]
+    duplicate: Mapped[int]
+    rejected: Mapped[int]
+
+
+class DataPolicy(Base):
+    __tablename__ = 'data_policy'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    retention_days: Mapped[int] = mapped_column(default=90)
+    enabled: Mapped[bool] = mapped_column(default=False)
+    pseudonym_key: Mapped[str] = mapped_column(String)
 
 
 def database(url=None):

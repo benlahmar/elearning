@@ -1,9 +1,10 @@
+import asyncio
 import hashlib
 import math
 import re
 import secrets
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -14,12 +15,14 @@ from pwdlib import PasswordHash
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from .db import AuthSession, Course, Event, Feedback, LearningSession, Resource, User, database, now
+from .db import AuthSession, Course, Event, Feedback, IngestionRecord, LearningSession, Resource, User, database, now
 from .metrics import coverage
 from .seed import seed
 from .migrate import migrate
 from .admin import install_admin
 from .storage import get_storage
+from .analytics import install_analytics
+from .data_policy import policy, retention_loop
 
 passwords = PasswordHash.recommended()
 dummy_hash = passwords.hash('invalid-password-placeholder')
@@ -82,8 +85,16 @@ def create_app(database_url=None):
         migrate(engine)
         with sessions() as db:
             seed(db)
-        yield
-        engine.dispose()
+            policy(db)
+            db.commit()
+        task = asyncio.create_task(retention_loop(sessions))
+        try:
+            yield
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+            engine.dispose()
 
     app = FastAPI(title='Learning Recsys Lab', lifespan=lifespan)
     app.state.sessions = sessions
@@ -231,6 +242,7 @@ def create_app(database_url=None):
             except IntegrityError:
                 status = 'duplicate'
             results.append({'event_id': id_, 'status': status})
+        db.add(IngestionRecord(user_id=user.id, accepted=sum(r['status'] == 'accepted' for r in results), duplicate=sum(r['status'] == 'duplicate' for r in results), rejected=sum(r['status'] == 'rejected' for r in results)))
         db.commit()
         return {'results': results}
 
@@ -242,6 +254,7 @@ def create_app(database_url=None):
             row = Feedback(user_id=user.id, resource_id=id_)
             db.add(row)
         row.useful, row.favorite = data.useful, data.favorite
+        row.updated_at = now()
         db.commit()
         return data.model_dump()
 
@@ -264,6 +277,7 @@ def create_app(database_url=None):
         return {'algorithm': algorithm, 'version': '1', 'items': [{**public_resource(r), 'reason': 'Selon vos intérêts' if algorithm == 'content' and interests else 'À découvrir dans le catalogue'} for r in ranked]}
 
     install_admin(app, db_session, current_user)
+    install_analytics(app, db_session, current_user)
     return app
 
 

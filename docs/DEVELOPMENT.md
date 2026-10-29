@@ -81,7 +81,7 @@ Scénario de validation : connexion admin → créer un cours → choisir MP4/PD
 - Un fichier publié ne se remplace pas : créer une nouvelle ressource permet de préserver la signification des événements historiques.
 - La file d’événements navigateur reste en mémoire ; fermeture d’onglet et coupure prolongée peuvent perdre des événements.
 - Les jetons d’authentification restent en mémoire ; rechargement = reconnexion. HTTPS, protection anti-bruteforce, gestion des comptes et politique de données restent nécessaires pour une exposition publique.
-- Pas encore de suivi d’impressions/clics de recommandation, de tableau de bord, de traitement de rétention/suppression ni d’évaluation expérimentale.
+- Pas encore de suivi d’impressions/clics de recommandation ni d’évaluation expérimentale. Le tableau de bord, l’export et la rétention/suppression sont disponibles en [version 0.3](ANALYTICS.md).
 - Les vidéos sont servies telles quelles : utiliser un MP4 compatible avec le navigateur. Pas encore de transcodage, de sous-titres importables ou de reprise automatique d’un upload interrompu.
 
 ## Vérifications
@@ -89,3 +89,7 @@ Scénario de validation : connexion admin → créer un cours → choisir MP4/PD
 Les tests couvrent l’ancien parcours, les permissions admin/apprenant, le cycle d’import/archivage et la reprise d’une base v0.1 avec conservation des données. Le stockage est simulé dans les tests unitaires ; un contrôle Compose séparé vérifie PostgreSQL 17 et MinIO. Aucune validation visuelle automatisée dans un navigateur.
 
 La première construction MinIO compile les sources Go et peut prendre plusieurs minutes ; les constructions suivantes utilisent le cache Docker.
+
+## Version 0.3
+
+Voir [ANALYTICS.md](ANALYTICS.md) pour la mise à jour, les définitions des indicateurs et le fonctionnement des exports, de la rétention et de la suppression des comptes.
