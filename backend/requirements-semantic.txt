@@ -1,0 +1,4 @@
+# Install CPU torch first (see Dockerfile and docs/ALGORITHMS.md).
+torch==2.9.0
+sentence-transformers==5.1.2
+transformers==4.57.1
