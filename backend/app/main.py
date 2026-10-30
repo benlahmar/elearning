@@ -1,7 +1,6 @@
 import asyncio
 import hashlib
 import math
-import re
 import secrets
 import uuid
 from contextlib import asynccontextmanager, suppress
@@ -22,6 +21,7 @@ from .migrate import migrate
 from .admin import install_admin
 from .storage import get_storage
 from .analytics import install_analytics
+from .recommender_routes import install_recommenders
 from .data_policy import policy, retention_loop
 
 passwords = PasswordHash.recommended()
@@ -264,18 +264,7 @@ def create_app(database_url=None):
         row = db.scalar(select(Feedback).where(Feedback.user_id == user.id, Feedback.resource_id == id_))
         return {'useful': row.useful if row else None, 'favorite': row.favorite if row else False}
 
-    @app.get('/recommendations')
-    def recommendations(algorithm: Literal['popular', 'content'] = 'content', user=Depends(current_user), db=Depends(db_session)):
-        resources = list(db.scalars(select(Resource).where(*visible())))
-        # Count distinct learners, not raw play/pause frequency.
-        popularity = dict(db.execute(select(Event.resource_id, func.count(func.distinct(Event.user_id))).group_by(Event.resource_id)).all())
-        interests = set(re.findall(r'\w+', ' '.join(user.interests).lower()))
-        def score(resource):
-            words = set(re.findall(r'\w+', ' '.join([resource.title, resource.topic, *resource.tags]).lower()))
-            return len(interests & words) / max(1, len(interests | words)) if algorithm == 'content' and interests else popularity.get(resource.id, 0)
-        ranked = sorted(resources, key=lambda r: (-score(r), r.id))[:6]
-        return {'algorithm': algorithm, 'version': '1', 'items': [{**public_resource(r), 'reason': 'Selon vos intérêts' if algorithm == 'content' and interests else 'À découvrir dans le catalogue'} for r in ranked]}
-
+    install_recommenders(app, db_session, current_user, visible, public_resource)
     install_admin(app, db_session, current_user)
     install_analytics(app, db_session, current_user)
     return app

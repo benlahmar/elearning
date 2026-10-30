@@ -93,3 +93,7 @@ La première construction MinIO compile les sources Go et peut prendre plusieurs
 ## Version 0.3
 
 Voir [ANALYTICS.md](ANALYTICS.md) pour la mise à jour, les définitions des indicateurs et le fonctionnement des exports, de la rétention et de la suppression des comptes.
+
+## Version 0.4
+
+Les algorithmes de recommandation sont désormais des modules indépendants, avec catalogue par famille, fiches pédagogiques, code source et essais dans l’administration. Voir [ALGORITHMS.md](ALGORITHMS.md) pour la mise à jour et la préparation de Sentence Transformers.

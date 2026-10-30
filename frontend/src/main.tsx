@@ -14,7 +14,9 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [items, setItems] = useState<Resource[]>([])
   const [recommendations, setRecommendations] = useState<Resource[]>([])
-  const [algorithm, setAlgorithm] = useState('content')
+  const [methods, setMethods] = useState<{id: string; name: string; available: boolean}[]>([])
+  const [recommendationInfo, setRecommendationInfo] = useState('')
+  const [algorithm, setAlgorithm] = useState('tfidf')
   const [q, setQ] = useState(''), [kind, setKind] = useState('')
   const [courses, setCourses] = useState<{ id: string; title: string }[]>([])
   const [courseId, setCourseId] = useState('')
@@ -34,7 +36,9 @@ function App() {
   useEffect(() => {
     if (!user) return
     let active = true
-    api(`/recommendations?algorithm=${algorithm}`).then(data => { if (active) setRecommendations(data.items) }).catch(e => { if (active) setError(e.message) })
+    setRecommendations([]); setRecommendationInfo('Calcul des recommandations…')
+    api<{algorithms: {id: string; name: string; available: boolean}[]}>('/algorithms').then(data => { if (active) setMethods(data.algorithms) }).catch(e => { if (active) setError(e.message) })
+    api(`/recommendations?algorithm=${algorithm}`).then(data => { if (active) { setRecommendations(data.items); setRecommendationInfo(data.fallback ? 'Profil sans signal exploitable pour cette méthode : classement par popularité.' : data.reason) } }).catch(e => { if (active) { setError(e.message); setRecommendationInfo('Calcul indisponible pour cette méthode.') } })
     return () => { active = false }
   }, [user, algorithm, revision])
 
@@ -82,7 +86,7 @@ function App() {
       {selection && <section className="detail"><button className="text-button" onClick={() => setSelection(null)}>← Fermer la ressource</button><h2>{selection.resource.title}</h2><p>{selection.resource.description}</p>{selection.resource.kind === 'video' ? <VideoPlayer key={selection.sessionId} resource={selection.resource} sessionId={selection.sessionId} initial={selection.progress} onProgress={progress => setSelection(previous => previous?.sessionId === selection.sessionId ? { ...previous, progress } : previous)} /> : <a className="primary file-link" href={selection.resource.url} target="_blank" rel="noreferrer" onClick={() => { void api('/events/batch', { method: 'POST', body: JSON.stringify({ events: [{ schema_version: 1, event_id: crypto.randomUUID(), session_id: selection.sessionId, sequence: 1, resource_id: selection.resource.id, event_type: 'resource_download', occurred_at: new Date().toISOString(), position_seconds: 0, payload: {} }] }) }).catch(e => setError(e.message)) }}>Ouvrir le document ↗</a>}
       {selection.resource.kind === 'video' && <div className="progress"><progress max="1" value={selection.progress.coverage}/><span>{Math.round(selection.progress.coverage * 100)} % visionné · {selection.progress.event_count} interactions enregistrées</span></div>}
       <div className="feedback"><button aria-pressed={selection.feedback.favorite} onClick={() => void feedback({ ...selection.feedback, favorite: !selection.feedback.favorite })}>{selection.feedback.favorite ? '★ Dans mes favoris' : '☆ Ajouter aux favoris'}</button><span>Cette ressource vous aide ?</span><button aria-pressed={selection.feedback.useful === true} onClick={() => void feedback({ ...selection.feedback, useful: true })}>Oui</button><button aria-pressed={selection.feedback.useful === false} onClick={() => void feedback({ ...selection.feedback, useful: false })}>Pas encore</button></div></section>}
-      <section><div className="section-heading"><div><span className="eyebrow">UNE PISTE POUR CONTINUER</span><h2>Pour vous</h2></div><label className="algorithm">Méthode <select value={algorithm} onChange={e => setAlgorithm(e.target.value)}><option value="content">Selon vos intérêts</option><option value="popular">Popularité</option></select></label></div><div className="cards">{recommendations.map(card)}</div><p className="muted small">Pilote : les vidéos sont des médias de démonstration, à remplacer par vos contenus pédagogiques.</p></section>
+      <section><div className="section-heading"><div><span className="eyebrow">UNE PISTE POUR CONTINUER</span><h2>Pour vous</h2></div><label className="algorithm">Méthode <select value={algorithm} onChange={e => setAlgorithm(e.target.value)}>{methods.length ? methods.map(m => <option key={m.id} value={m.id} disabled={!m.available}>{m.name}{!m.available ? ' · modèle à préparer' : ''}</option>) : <option value="tfidf">TF-IDF</option>}</select></label></div><p className="muted small" role="status">{recommendationInfo}</p><div className="cards">{recommendations.map(card)}</div><p className="muted small">Pilote : les vidéos sont des médias de démonstration, à remplacer par vos contenus pédagogiques.</p></section>
       <section id="catalogue"><div className="section-heading"><div><span className="eyebrow">À EXPLORER</span><h2>Le catalogue</h2></div><span className="muted">{items.length} ressources</span></div><div className="filters"><input aria-label="Rechercher une ressource" placeholder="Rechercher une ressource…" value={q} onChange={e => setQ(e.target.value)}/><select aria-label="Cours" value={courseId} onChange={e => setCourseId(e.target.value)}><option value="">Tous les cours</option>{courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select><select aria-label="Type de ressource" value={kind} onChange={e => setKind(e.target.value)}><option value="">Tous les formats</option><option value="video">Vidéos</option><option value="file">Documents</option></select></div><div className="cards">{items.map(card)}</div>{items.length === 0 && <p>Aucune ressource ne correspond à votre recherche.</p>}</section>
       <p className="privacy">Vos interactions servent aux expérimentations du cours. Une pause ou un retour arrière ne permet pas de conclure à une difficulté. Contactez votre enseignant pour toute demande sur vos données.</p>
       </div>{adminView && <Admin onChange={() => setRevision(r => r + 1)} />}
